@@ -1,0 +1,2 @@
+-keep class net.fortuna.ical4j.** { *; }
+-keep class com.rvishal.tvcalendar.data.model.** { *; }
