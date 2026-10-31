@@ -45,10 +45,10 @@ class GoogleAuthManager(
     }
 
     /** Polls until the user completes sign-in or the code expires. Returns the access token. */
-    suspend fun awaitSignIn(clientId: String, deviceCode: String, intervalSec: Int, timeoutSec: Int): String {
+    suspend fun awaitSignIn(clientId: String, clientSecret: String, deviceCode: String, intervalSec: Int, timeoutSec: Int): String {
         var waited = 0
         while (waited < timeoutSec) {
-            val token = poll(clientId, deviceCode)
+            val token = poll(clientId, clientSecret, deviceCode)
             when (token.error) {
                 null -> {
                     token.accessToken?.let { storeTokens(token) }
@@ -64,9 +64,10 @@ class GoogleAuthManager(
         error("sign-in timed out")
     }
 
-    private suspend fun poll(clientId: String, deviceCode: String): TokenResponse = withContext(Dispatchers.IO) {
+    private suspend fun poll(clientId: String, clientSecret: String, deviceCode: String): TokenResponse = withContext(Dispatchers.IO) {
         val body = FormBody.Builder()
             .add("client_id", clientId)
+            .add("client_secret", clientSecret)
             .add("device_code", deviceCode)
             .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
             .build()
@@ -76,7 +77,7 @@ class GoogleAuthManager(
         }
     }
 
-    suspend fun validAccessToken(clientId: String): String? {
+    suspend fun validAccessToken(clientId: String, clientSecret: String): String? {
         val refresh = settings.googleRefreshToken ?: return null
         if (settings.googleAccessToken != null &&
             System.currentTimeMillis() < settings.googleTokenExpiry - 60_000
@@ -84,6 +85,7 @@ class GoogleAuthManager(
 
         val body = FormBody.Builder()
             .add("client_id", clientId)
+            .add("client_secret", clientSecret)
             .add("refresh_token", refresh)
             .add("grant_type", "refresh_token")
             .build()

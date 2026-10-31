@@ -71,6 +71,16 @@ fun SettingsScreen(nav: NavHostController): Unit {
                             Text("Sign in with Google")
                         }
                     }
+                    is GoogleState.SignInFailed -> {
+                        Text(
+                            "Sign-in failed: ${s.message}",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Button(onClick = vm::startGoogleSignIn, modifier = Modifier.padding(top = 8.dp)) {
+                            Text("Try again")
+                        }
+                    }
                     is GoogleState.AwaitingUser -> {
                         Text(
                             "On your phone or computer go to ${s.verificationUrl} and enter code:",

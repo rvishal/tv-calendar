@@ -61,7 +61,7 @@ class GoogleCalendarSource(
     )
 
     override suspend fun fetch(windowStartMillis: Long, windowEndMillis: Long): List<CalendarEvent> {
-        val token = auth.validAccessToken(clientId()) ?: return emptyList()
+        val token = auth.validAccessToken(clientId(), clientSecret()) ?: return emptyList()
         val out = mutableListOf<CalendarEvent>()
         var pageToken: String? = null
         do {
@@ -134,4 +134,5 @@ class GoogleCalendarSource(
     }
 
     private fun clientId(): String = context.getString(R.string.google_client_id)
+    private fun clientSecret(): String = context.getString(R.string.google_client_secret)
 }

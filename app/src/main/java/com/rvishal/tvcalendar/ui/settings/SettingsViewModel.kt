@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 sealed interface GoogleState {
     data object SignedOut : GoogleState
     data class AwaitingUser(val userCode: String, val verificationUrl: String) : GoogleState
+    data class SignInFailed(val message: String) : GoogleState
     data object SignedIn : GoogleState
 }
 
@@ -57,8 +58,9 @@ class SettingsViewModel(
 
     fun startGoogleSignIn() {
         val clientId = context.getString(R.string.google_client_id)
+        val clientSecret = context.getString(R.string.google_client_secret)
         if (clientId == "YOUR_GOOGLE_TV_CLIENT_ID") {
-            _state.update { it.copy(syncErrors = mapOf("Google" to "Client ID not configured")) }
+            _state.update { it.copy(google = GoogleState.SignInFailed("Client ID not configured")) }
             return
         }
         signInJob?.cancel()
@@ -68,14 +70,16 @@ class SettingsViewModel(
                 _state.update {
                     it.copy(google = GoogleState.AwaitingUser(code.userCode, code.verificationUrl))
                 }
-                auth.awaitSignIn(clientId, code.deviceCode, code.interval, code.expiresIn)
+                auth.awaitSignIn(clientId, clientSecret, code.deviceCode, code.interval, code.expiresIn)
                 _state.update { it.copy(google = GoogleState.SignedIn) }
                 repository.syncAll()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("SettingsViewModel", "Google sign-in failed", e)
                 _state.update {
                     it.copy(
-                        google = if (settings.isGoogleSignedIn) GoogleState.SignedIn else GoogleState.SignedOut,
-                        syncErrors = mapOf("Google" to (e.message ?: "sign-in failed")),
+                        google = if (settings.isGoogleSignedIn) GoogleState.SignedIn
+                                 else GoogleState.SignInFailed(e.message ?: "sign-in failed"),
                     )
                 }
             }
@@ -84,7 +88,9 @@ class SettingsViewModel(
 
     fun cancelGoogleSignIn() {
         signInJob?.cancel()
-        _state.update { it.copy(google = GoogleState.SignedOut) }
+        _state.update {
+            it.copy(google = if (settings.isGoogleSignedIn) GoogleState.SignedIn else GoogleState.SignedOut)
+        }
     }
 
     fun signOutGoogle() {
