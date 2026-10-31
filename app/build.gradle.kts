@@ -1,3 +1,5 @@
+import java.util.Properties
+
 buildscript {
     repositories {
         maven("https://maven.aliyun.com/repository/central")
@@ -18,6 +20,15 @@ plugins {
 
 apply(plugin = "com.google.devtools.ksp")
 
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val googleClientId: String = (localProps.getProperty("google_client_id")
+    ?: System.getenv("GOOGLE_CLIENT_ID")).orEmpty()
+val googleClientSecret: String = (localProps.getProperty("google_client_secret")
+    ?: System.getenv("GOOGLE_CLIENT_SECRET")).orEmpty()
+
 android {
     namespace = "com.rvishal.tvcalendar"
     compileSdk = 35
@@ -29,6 +40,8 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         vectorDrawables { useSupportLibrary = true }
+        resValue("string", "google_client_id", googleClientId)
+        resValue("string", "google_client_secret", googleClientSecret)
     }
 
     buildTypes {
