@@ -38,6 +38,21 @@ class GoogleCalendarSource(
     )
 
     @Serializable
+    data class CalendarListResponse(
+        val items: List<CalendarEntry> = emptyList(),
+        @SerialName("nextPageToken") val nextPageToken: String? = null,
+    )
+
+    @Serializable
+    data class CalendarEntry(
+        val id: String,
+        val summary: String? = null,
+        val accessRole: String? = null,
+        val deleted: Boolean = false,
+        val hidden: Boolean = false,
+    )
+
+    @Serializable
     data class Item(
         val id: String,
         val summary: String? = null,
@@ -61,41 +76,70 @@ class GoogleCalendarSource(
     )
 
     override suspend fun fetch(windowStartMillis: Long, windowEndMillis: Long): List<CalendarEvent> {
-        val token = auth.validAccessToken(clientId()) ?: return emptyList()
+        val token = auth.validAccessToken(clientId(), clientSecret()) ?: return emptyList()
         val out = mutableListOf<CalendarEvent>()
+        for (cal in listCalendars(token)) {
+            var pageToken: String? = null
+            do {
+                val eventsUrl = "https://www.googleapis.com/calendar/v3/calendars/"
+                    .toHttpUrl().newBuilder()
+                    .addPathSegment(cal.id.trim('/').removePrefix("calendars/"))
+                    .addPathSegment("events")
+                    .addQueryParameter("singleInstances", "true")
+                    .addQueryParameter("timeMin", rfc3339.format(windowStartMillis))
+                    .addQueryParameter("timeMax", rfc3339.format(windowEndMillis))
+                    .addQueryParameter("maxResults", "250")
+                    .apply { pageToken?.let { addQueryParameter("pageToken", it) } }
+                    .build()
+                val req = Request.Builder().url(eventsUrl).header("Authorization", "Bearer $token").build()
+                val page = withContext(Dispatchers.IO) {
+                    client.newCall(req).execute().use { resp ->
+                        if (!resp.isSuccessful) return@use null
+                        json.decodeFromString(EventListResponse.serializer(), resp.body!!.string())
+                    }
+                } ?: break
+                out += page.items.filter { it.status != "cancelled" }.mapNotNull { it.toEvent(cal) }
+                pageToken = page.nextPageToken
+                page.nextSyncToken?.let { settings.googleSyncToken = it }
+            } while (pageToken != null)
+        }
+        return out
+    }
+
+    private suspend fun listCalendars(token: String): List<CalendarEntry> {
+        val out = mutableListOf<CalendarEntry>()
         var pageToken: String? = null
         do {
-            val url = "https://www.googleapis.com/calendar/v3/calendars/primary/events".toHttpUrl()
+            val url = "https://www.googleapis.com/calendar/v3/users/me/calendarList".toHttpUrl()
                 .newBuilder()
-                .addQueryParameter("singleInstances", "true")
-                .addQueryParameter("timeMin", rfc3339.format(windowStartMillis))
-                .addQueryParameter("timeMax", rfc3339.format(windowEndMillis))
-                .addQueryParameter("maxResults", "250")
+                .addQueryParameter("maxResults", "100")
                 .apply { pageToken?.let { addQueryParameter("pageToken", it) } }
                 .build()
             val req = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
             val page = withContext(Dispatchers.IO) {
                 client.newCall(req).execute().use { resp ->
                     check(resp.isSuccessful) { "calendar list failed: ${resp.code}" }
-                    json.decodeFromString(EventListResponse.serializer(), resp.body!!.string())
+                    json.decodeFromString(CalendarListResponse.serializer(), resp.body!!.string())
                 }
             }
-            out += page.items.filter { it.status != "cancelled" }.mapNotNull { it.toEvent() }
+            out += page.items.filter { entry ->
+                !entry.deleted && !entry.hidden &&
+                    entry.accessRole != "freeBusyReader"
+            }
             pageToken = page.nextPageToken
-            page.nextSyncToken?.let { settings.googleSyncToken = it }
         } while (pageToken != null)
         return out
     }
 
-    private fun Item.toEvent(): CalendarEvent? {
+    private fun Item.toEvent(cal: CalendarEntry): CalendarEvent? {
         val s = start ?: return null
         val e = end ?: return null
         val (startMs, allDay) = parseTime(s)
         val (endMs, _) = parseTime(e)
         return CalendarEvent(
-            id = "gcal:$id",
+            id = "gcal:${cal.id}:$id",
             source = EventSource.GOOGLE,
-            calendarName = "Google Calendar",
+            calendarName = cal.summary ?: "Google Calendar",
             title = summary ?: "(no title)",
             description = description,
             location = location,
@@ -134,4 +178,5 @@ class GoogleCalendarSource(
     }
 
     private fun clientId(): String = context.getString(R.string.google_client_id)
+    private fun clientSecret(): String = context.getString(R.string.google_client_secret)
 }

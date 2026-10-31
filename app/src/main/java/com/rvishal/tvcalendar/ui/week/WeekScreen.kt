@@ -32,6 +32,7 @@ import androidx.tv.material3.Text
 import com.rvishal.tvcalendar.ui.CalendarViewModel
 import com.rvishal.tvcalendar.ui.components.TopBar
 import com.rvishal.tvcalendar.ui.components.ViewMode
+import com.rvishal.tvcalendar.ui.components.eventsOnDay
 import com.rvishal.tvcalendar.ui.theme.IosRed
 import com.rvishal.tvcalendar.util.Dates
 
@@ -72,10 +73,7 @@ fun WeekScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Calen
         ) {
             repeat(7) { i ->
                 val dayMillis = Dates.plusDays(weekStart, i)
-                val dayEvents = events.filter {
-                    val dayStart = Dates.startOfDay(dayMillis)
-                    it.startMillis < dayStart + 86_400_000 && it.endMillis > dayStart
-                }
+                val dayEvents = eventsOnDay(events, dayMillis)
                 Column(
                     Modifier
                         .weight(1f)

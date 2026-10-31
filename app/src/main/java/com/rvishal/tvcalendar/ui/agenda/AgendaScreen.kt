@@ -28,7 +28,7 @@ fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cal
     val events by vm.events.collectAsState()
     val now = System.currentTimeMillis()
     val upcoming = events.filter { it.endMillis >= now }.sortedBy { it.startMillis }
-    val grouped = upcoming.groupBy { Dates.startOfDay(it.startMillis) }.toSortedMap()
+    val grouped = upcoming.groupBy { Dates.dayKeyMillis(it.startMillis, it.allDay) }.toSortedMap()
 
     Column(Modifier.fillMaxSize()) {
         TopBar(
@@ -56,7 +56,11 @@ fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cal
                     )
                 }
                 dayEvents.forEach { e ->
-                    item(key = e.id) { EventRow(e, vm.settings.use24Hour) }
+                    item(key = e.id) {
+                        EventRow(e, vm.settings.use24Hour) {
+                            nav.navigate("day/${Dates.dayKeyMillis(e.startMillis, e.allDay)}")
+                        }
+                    }
                 }
             }
         }

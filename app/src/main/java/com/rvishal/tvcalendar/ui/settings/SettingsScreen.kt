@@ -22,7 +22,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import com.rvishal.tvcalendar.data.model.EventSource
-import com.rvishal.tvcalendar.data.prefs.SettingsStore
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -51,8 +50,8 @@ fun SettingsScreen(nav: NavHostController): Unit {
             EventSource.entries.forEach { src ->
                 item(key = "src_${src.name}") {
                     SettingSwitch(
-                        label = "${src.label}${srcStatus(src, state.settings)}",
-                        checked = state.settings.isSourceEnabled(src.name),
+                        label = "${src.label}${srcStatus(src, state)}",
+                        checked = state.sourceEnabled[src.name] == true,
                     ) { vm.setSourceEnabled(src.name, it) }
                 }
             }
@@ -70,6 +69,16 @@ fun SettingsScreen(nav: NavHostController): Unit {
                         )
                         Button(onClick = vm::startGoogleSignIn, modifier = Modifier.padding(top = 8.dp)) {
                             Text("Sign in with Google")
+                        }
+                    }
+                    is GoogleState.SignInFailed -> {
+                        Text(
+                            "Sign-in failed: ${s.message}",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Button(onClick = vm::startGoogleSignIn, modifier = Modifier.padding(top = 8.dp)) {
+                            Text("Try again")
                         }
                     }
                     is GoogleState.AwaitingUser -> {
@@ -139,7 +148,7 @@ fun SettingsScreen(nav: NavHostController): Unit {
             item {
                 Text("Display", fontSize = 18.sp, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 24.dp))
-                SettingSwitch("24-hour time", state.settings.use24Hour) { vm.set24h(it) }
+                SettingSwitch("24-hour time", state.use24h) { vm.set24h(it) }
             }
 
             item {
@@ -159,9 +168,9 @@ fun SettingsScreen(nav: NavHostController): Unit {
     }
 }
 
-private fun srcStatus(src: EventSource, settings: SettingsStore): String = when (src) {
-    EventSource.GOOGLE -> if (settings.isGoogleSignedIn) "" else " (not signed in)"
-    EventSource.APPLE -> if (settings.isCaldavConfigured) "" else " (not configured)"
+private fun srcStatus(src: EventSource, state: SettingsUiState): String = when (src) {
+    EventSource.GOOGLE -> if (state.google is GoogleState.SignedIn) "" else " (not signed in)"
+    EventSource.APPLE -> if (state.caldavUser.isNotBlank() && state.caldavPassword.isNotBlank()) "" else " (not configured)"
     else -> ""
 }
 
