@@ -27,6 +27,8 @@ data class SettingsUiState(
     val caldavBaseUrl: String,
     val festivalUrl: String,
     val syncErrors: Map<String, String>,
+    val sourceEnabled: Map<String, Boolean>,
+    val use24h: Boolean,
 )
 
 class SettingsViewModel(
@@ -45,6 +47,8 @@ class SettingsViewModel(
             caldavBaseUrl = settings.caldavBaseUrl,
             festivalUrl = settings.festivalIcsUrl,
             syncErrors = emptyMap(),
+            sourceEnabled = sourceEnabledMap(),
+            use24h = settings.use24Hour,
         )
     )
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -110,11 +114,17 @@ class SettingsViewModel(
 
     fun set24h(v: Boolean) {
         settings.use24Hour = v
+        _state.update { it.copy(use24h = v) }
     }
 
     fun setSourceEnabled(name: String, enabled: Boolean) {
         settings.setSourceEnabled(name, enabled)
+        _state.update { it.copy(sourceEnabled = sourceEnabledMap()) }
     }
+
+    private fun sourceEnabledMap(): Map<String, Boolean> =
+        com.rvishal.tvcalendar.data.model.EventSource.entries
+            .associate { it.name to settings.isSourceEnabled(it.name) }
 
     fun syncNow() {
         viewModelScope.launch {

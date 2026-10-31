@@ -1,6 +1,7 @@
 package com.rvishal.tvcalendar.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,9 +10,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,12 +62,35 @@ fun TopBar(
     }
 }
 
+/** Events visible on the local calendar day at [dayMillis] (a start-of-day anchor). */
+fun eventsOnDay(events: List<CalendarEvent>, dayMillis: Long): List<CalendarEvent> {
+    val dayStart = Dates.startOfDay(dayMillis)
+    return events.filter { e ->
+        if (e.allDay) {
+            val first = Dates.dayKeyMillis(e.startMillis, allDay = true)
+            val last = Dates.dayKeyMillis(e.endMillis - 1, allDay = true)
+            dayStart in first..last
+        } else {
+            e.startMillis < dayStart + 86_400_000 && e.endMillis > dayStart
+        }
+    }
+}
+
 @Composable
 fun EventRow(event: CalendarEvent, use24h: Boolean, onClick: () -> Unit = {}) {
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
+            .background(
+                if (focused) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                else Color.Transparent,
+                RoundedCornerShape(6.dp),
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Spacer(

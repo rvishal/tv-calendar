@@ -36,6 +36,7 @@ import androidx.tv.material3.Text
 import com.rvishal.tvcalendar.ui.CalendarViewModel
 import com.rvishal.tvcalendar.ui.components.TopBar
 import com.rvishal.tvcalendar.ui.components.ViewMode
+import com.rvishal.tvcalendar.ui.components.eventsOnDay
 import com.rvishal.tvcalendar.ui.theme.IosRed
 import com.rvishal.tvcalendar.util.Dates
 import java.util.Calendar
@@ -92,7 +93,7 @@ fun MonthScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cale
                     repeat(7) { col ->
                         val dayMillis = Dates.plusDays(gridStart, row * 7 + col)
                         val inMonth = Dates.field(dayMillis, Calendar.MONTH) == month
-                        val dayEvents = eventsForDay(events, dayMillis)
+                        val dayEvents = eventsOnDay(events, dayMillis)
                         DayCell(
                             dayMillis = dayMillis,
                             dayNum = Dates.field(dayMillis, Calendar.DAY_OF_MONTH),
@@ -180,10 +181,4 @@ private fun DayCell(
     }
 }
 
-private fun eventsForDay(
-    events: List<com.rvishal.tvcalendar.data.model.CalendarEvent>,
-    dayMillis: Long,
-) = events.filter { e ->
-    val dayStart = Dates.startOfDay(dayMillis)
-    e.startMillis < dayStart + 86_400_000 && e.endMillis > dayStart
-}
+

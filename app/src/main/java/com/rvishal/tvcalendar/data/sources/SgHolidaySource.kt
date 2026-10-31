@@ -25,8 +25,10 @@ class SgHolidaySource(
 
     private val collectionUrl =
         "https://api-production.data.gov.sg/v2/public/api/collections/691/metadata"
+    // All-day dates are anchored at UTC midnight so they land on the intended
+    // calendar date regardless of the device timezone.
     private val day = SimpleDateFormat("yyyy-MM-dd").apply {
-        timeZone = TimeZone.getTimeZone("Asia/Singapore")
+        timeZone = TimeZone.getTimeZone("UTC")
     }
 
     @Serializable

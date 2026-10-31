@@ -19,6 +19,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.rvishal.tvcalendar.ui.CalendarViewModel
 import com.rvishal.tvcalendar.ui.components.EventRow
+import com.rvishal.tvcalendar.ui.components.eventsOnDay
 import com.rvishal.tvcalendar.util.Dates
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -26,9 +27,7 @@ import com.rvishal.tvcalendar.util.Dates
 fun DayScreen(nav: NavHostController, dayStartMillis: Long, vm: CalendarViewModel = viewModel { CalendarViewModel(com.rvishal.tvcalendar.di.AppGraph.repository, com.rvishal.tvcalendar.di.AppGraph.settings) }) {
     val events by vm.events.collectAsState()
     val dayStart = Dates.startOfDay(dayStartMillis)
-    val dayEvents = events
-        .filter { it.startMillis < dayStart + 86_400_000 && it.endMillis > dayStart }
-        .sortedBy { it.startMillis }
+    val dayEvents = eventsOnDay(events, dayStart).sortedBy { it.startMillis }
 
     Column(Modifier.fillMaxSize().padding(48.dp)) {
         Button(onClick = { nav.popBackStack() }) { Text("‹ Back") }

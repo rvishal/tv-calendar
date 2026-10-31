@@ -64,6 +64,21 @@ object Dates {
     fun time(millis: Long, use24h: Boolean): String =
         SimpleDateFormat(if (use24h) "HH:mm" else "h:mm a", Locale.getDefault()).format(millis)
 
+    /**
+     * The local-tz day a date belongs to for display purposes. All-day events are
+     * anchored at UTC midnight, so their "day" is the UTC calendar date rendered
+     * on the matching local calendar date — never shifted by the device timezone.
+     */
+    fun dayKeyMillis(millis: Long, allDay: Boolean): Long {
+        if (!allDay) return startOfDay(millis)
+        val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        utc.timeInMillis = millis
+        val local = Calendar.getInstance()
+        local.clear()
+        local.set(utc.get(Calendar.YEAR), utc.get(Calendar.MONTH), utc.get(Calendar.DAY_OF_MONTH))
+        return local.timeInMillis
+    }
+
     fun isToday(millis: Long): Boolean =
         startOfDay(millis) == startOfDay(System.currentTimeMillis())
 
