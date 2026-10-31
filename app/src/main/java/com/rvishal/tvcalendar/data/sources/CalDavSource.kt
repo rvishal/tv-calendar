@@ -39,10 +39,36 @@ class CalDavSource(
         val calendars = discoverCalendars()
         val out = mutableListOf<CalendarEvent>()
         for (cal in calendars) {
-            val ics = reportCalendar(cal.url, windowStartMillis, windowEndMillis) ?: continue
-            out += IcsParser.parse(
-                ics, EventSource.APPLE, cal.name, windowStartMillis, windowEndMillis
-            ).map { it.copy(color = cal.color ?: it.color) }
+            val xml = reportCalendar(cal.url, windowStartMillis, windowEndMillis) ?: continue
+            for (ics in extractCalendarData(xml)) {
+                runCatching {
+                    out += IcsParser.parse(
+                        ics, EventSource.APPLE, cal.name, windowStartMillis, windowEndMillis
+                    ).map { it.copy(color = cal.color ?: it.color) }
+                }.onFailure { android.util.Log.w("CalDavSource", "ics parse failed for ${cal.name}", it) }
+            }
+        }
+        return out
+    }
+
+    /** Pulls each <calendar-data> ICS block out of a REPORT multistatus response. */
+    private fun extractCalendarData(xml: String): List<String> {
+        val parser = xmlFactory.newPullParser().apply { setInput(StringReader(xml)) }
+        val out = mutableListOf<String>()
+        val buf = StringBuilder()
+        var inside = false
+        var event = parser.eventType
+        while (event != XmlPullParser.END_DOCUMENT) {
+            when (event) {
+                XmlPullParser.START_TAG -> if (parser.name == "calendar-data") { inside = true; buf.clear() }
+                XmlPullParser.TEXT -> if (inside) buf.append(parser.text)
+                XmlPullParser.END_TAG -> if (parser.name == "calendar-data" && inside) {
+                    inside = false
+                    val ics = buf.toString().trim()
+                    if (ics.isNotEmpty()) out += ics
+                }
+            }
+            event = parser.next()
         }
         return out
     }
@@ -51,13 +77,13 @@ class CalDavSource(
         val base = settings.caldavBaseUrl.trimEnd('/')
         val principal = propfindSingle(
             url = base, depth = "0",
-            props = listOf("current-user-principal"),
+            props = listOf("current-user-principal" to "DAV:"),
             wantedHrefTag = "current-user-principal",
         ) ?: return emptyList()
 
         val homeSet = propfindSingle(
             url = absolute(base, principal), depth = "0",
-            props = listOf("calendar-home-set"),
+            props = listOf("calendar-home-set" to "urn:ietf:params:xml:ns:caldav"),
             wantedHrefTag = "calendar-home-set",
         ) ?: return emptyList()
 
@@ -84,8 +110,8 @@ class CalDavSource(
         return davRequest("REPORT", calendarUrl, "1", body)
     }
 
-    private suspend fun propfindSingle(url: String, depth: String, props: List<String>, wantedHrefTag: String): String? {
-        val body = propfindBody(*props.map { it to "DAV:" }.toTypedArray())
+    private suspend fun propfindSingle(url: String, depth: String, props: List<Pair<String, String>>, wantedHrefTag: String): String? {
+        val body = propfindBody(*props.toTypedArray())
         val xml = propfindRaw(url, depth, body) ?: return null
         return extractHref(xml, wantedHrefTag)
     }
@@ -103,9 +129,12 @@ class CalDavSource(
                 .build()
             runCatching {
                 client.newCall(req).execute().use { resp ->
-                    if (resp.isSuccessful) resp.body?.string() else null
+                    if (resp.isSuccessful) resp.body?.string() else {
+                        android.util.Log.w("CalDavSource", "$method $url -> ${resp.code}")
+                        null
+                    }
                 }
-            }.getOrNull()
+            }.onFailure { android.util.Log.w("CalDavSource", "$method $url failed", it) }.getOrNull()
         }
 
     private fun propfindBody(vararg props: Pair<String, String>): String {
