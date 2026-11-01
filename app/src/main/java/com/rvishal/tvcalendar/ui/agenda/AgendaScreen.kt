@@ -33,7 +33,11 @@ fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cal
         if (e.allDay) Dates.dayKeyMillis(e.endMillis - 1, allDay = true) >= todayStart
         else e.endMillis >= now
     }.sortedBy { it.startMillis }
-    val grouped = upcoming.groupBy { Dates.dayKeyMillis(it.startMillis, it.allDay) }.toSortedMap()
+    // Items that started before today but are still ongoing group under today,
+    // not a past day.
+    fun displayDay(e: com.rvishal.tvcalendar.data.model.CalendarEvent) =
+        maxOf(Dates.dayKeyMillis(e.startMillis, e.allDay), todayStart)
+    val grouped = upcoming.groupBy { displayDay(it) }.toSortedMap()
 
     Column(Modifier.fillMaxSize()) {
         TopBar(
@@ -63,7 +67,7 @@ fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cal
                 dayEvents.forEach { e ->
                     item(key = e.id) {
                         EventRow(e, vm.settings.use24Hour) {
-                            nav.navigate("day/${Dates.dayKeyMillis(e.startMillis, e.allDay)}")
+                            nav.navigate("day/${displayDay(e)}")
                         }
                     }
                 }
