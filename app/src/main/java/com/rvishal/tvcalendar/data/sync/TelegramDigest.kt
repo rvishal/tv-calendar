@@ -52,11 +52,13 @@ class TelegramDigest(
             .post(body).build()
         client.newCall(req).execute().use { resp ->
             val respBody = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) error("telegram send failed: ${resp.code} $respBody")
             val parsed = runCatching {
                 json.decodeFromString(SendResponse.serializer(), respBody)
             }.getOrNull()
-            if (parsed?.ok == false) error("telegram send failed: ${parsed.description}")
+            if (!resp.isSuccessful || parsed?.ok == false) {
+                val desc = parsed?.description?.replace(token, "<redacted>")?.take(200)
+                error("telegram send failed: ${resp.code}${desc?.let { " $it" }.orEmpty()}")
+            }
             "sent"
         }
     }

@@ -80,8 +80,20 @@ class EventRepository(
 
     suspend fun todayEvents(): List<CalendarEvent> {
         val start = startOfDay(System.currentTimeMillis())
-        return dao.inWindow(start, start + 86_400_000L).map { it.toModel() }
+        val end = Calendar.getInstance().apply { timeInMillis = start; add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
+        val day = 86_400_000L
+        // Widen the query to cover UTC-anchored all-day items, then filter precisely.
+        return dao.inWindow(start - day, end + day).map { it.toModel() }
             .filter { settings.isSourceEnabled(it.source.name) }
+            .filter { e ->
+                if (e.allDay) {
+                    val first = com.rvishal.tvcalendar.util.Dates.dayKeyMillis(e.startMillis, true)
+                    val last = com.rvishal.tvcalendar.util.Dates.dayKeyMillis(maxOf(e.startMillis, e.endMillis - 1), true)
+                    first <= start && last >= start
+                } else {
+                    e.startMillis < end && e.endMillis > start
+                }
+            }
     }
 
     private fun startOfDay(millis: Long): Long {

@@ -28,9 +28,9 @@ class GoogleTasksSource(
     override val source = EventSource.GTASK
     override val isConfigured: Boolean get() = settings.isGoogleSignedIn
 
-    @Serializable data class TaskListsResponse(val items: List<TaskList> = emptyList())
+    @Serializable data class TaskListsResponse(val items: List<TaskList> = emptyList(), val nextPageToken: String? = null)
     @Serializable data class TaskList(val id: String, val title: String = "Tasks")
-    @Serializable data class TasksResponse(val items: List<Task> = emptyList())
+    @Serializable data class TasksResponse(val items: List<Task> = emptyList(), val nextPageToken: String? = null)
     @Serializable data class Task(
         val id: String,
         val title: String = "",
@@ -48,21 +48,36 @@ class GoogleTasksSource(
                 context.getString(R.string.google_client_secret),
             ) ?: error("not signed in")
 
-            val listsUrl = "https://tasks.googleapis.com/tasks/v1/users/@me/lists".toHttpUrl()
-            val lists = get(listsUrl.toString(), token)
-                ?: return@withContext emptyList()
-            val taskLists = json.decodeFromString(TaskListsResponse.serializer(), lists).items
+            val taskLists = mutableListOf<TaskList>()
+            var listsPage: String? = null
+            do {
+                val url = "https://tasks.googleapis.com/tasks/v1/users/@me/lists".toHttpUrl()
+                    .newBuilder()
+                    .addQueryParameter("maxResults", "100")
+                    .apply { listsPage?.let { addQueryParameter("pageToken", it) } }
+                    .build().toString()
+                val resp = json.decodeFromString(TaskListsResponse.serializer(), get(url, token))
+                taskLists += resp.items
+                listsPage = resp.nextPageToken
+            } while (listsPage != null)
 
             val out = mutableListOf<CalendarEvent>()
             for (list in taskLists) {
-                val url = "https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks".toHttpUrl()
-                    .newBuilder()
-                    .addQueryParameter("showCompleted", "true")
-                    .addQueryParameter("showHidden", "false")
-                    .addQueryParameter("maxResults", "100")
-                    .build().toString()
-                val body = get(url, token) ?: continue
-                for (task in json.decodeFromString(TasksResponse.serializer(), body).items) {
+                val tasks = mutableListOf<Task>()
+                var page: String? = null
+                do {
+                    val url = "https://tasks.googleapis.com/tasks/v1/lists/${list.id}/tasks".toHttpUrl()
+                        .newBuilder()
+                        .addQueryParameter("showCompleted", "true")
+                        .addQueryParameter("showHidden", "false")
+                        .addQueryParameter("maxResults", "100")
+                        .apply { page?.let { addQueryParameter("pageToken", it) } }
+                        .build().toString()
+                    val resp = json.decodeFromString(TasksResponse.serializer(), get(url, token))
+                    tasks += resp.items
+                    page = resp.nextPageToken
+                } while (page != null)
+                for (task in tasks) {
                     if (task.deleted || task.hidden) continue
                     val due = task.due?.let { Instant.parse(it).toEpochMilli() } ?: continue
                     if (due < windowStartMillis || due >= windowEndMillis) continue
@@ -83,12 +98,12 @@ class GoogleTasksSource(
             out
         }
 
-    private fun get(url: String, token: String): String? {
+    /** Throws on failure so syncAll keeps the cached tasks instead of wiping them. */
+    private fun get(url: String, token: String): String {
         val req = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
         client.newCall(req).execute().use { resp ->
-            if (resp.isSuccessful) return resp.body?.string()
-            android.util.Log.w("GoogleTasksSource", "GET $url -> ${resp.code}")
-            return null
+            if (!resp.isSuccessful) error("Google Tasks HTTP ${resp.code}")
+            return resp.body?.string() ?: error("Google Tasks empty response")
         }
     }
 }
