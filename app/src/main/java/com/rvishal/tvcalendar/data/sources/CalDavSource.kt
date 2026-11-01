@@ -39,13 +39,16 @@ class CalDavSource(
         val calendars = discoverCalendars()
         val out = mutableListOf<CalendarEvent>()
         for (cal in calendars) {
-            val xml = reportCalendar(cal.url, windowStartMillis, windowEndMillis) ?: continue
-            for (ics in extractCalendarData(xml)) {
-                runCatching {
-                    out += IcsParser.parse(
-                        ics, EventSource.APPLE, cal.name, windowStartMillis, windowEndMillis
-                    ).map { it.copy(color = cal.color ?: it.color) }
-                }.onFailure { android.util.Log.w("CalDavSource", "ics parse failed for ${cal.name}", it) }
+            for ((xml, parser) in listOfNotNull(
+                reportCalendar(cal.url, "VEVENT", windowStartMillis, windowEndMillis)?.let { it to IcsParser::parse },
+                reportCalendar(cal.url, "VTODO", windowStartMillis, windowEndMillis)?.let { it to IcsParser::parseTodos },
+            )) {
+                for (ics in extractCalendarData(xml)) {
+                    runCatching {
+                        out += parser(ics, EventSource.APPLE, cal.name, windowStartMillis, windowEndMillis)
+                            .map { it.copy(color = cal.color ?: it.color) }
+                    }.onFailure { android.util.Log.w("CalDavSource", "ics parse failed for ${cal.name}", it) }
+                }
             }
         }
         return out
@@ -98,11 +101,11 @@ class CalDavSource(
         return parseCalendarList(absolute(base, homeSet), multistatus)
     }
 
-    private suspend fun reportCalendar(calendarUrl: String, start: Long, end: Long): String? {
+    private suspend fun reportCalendar(calendarUrl: String, compType: String, start: Long, end: Long): String? {
         val body = """
             <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
               <d:prop><d:getetag/><c:calendar-data/></d:prop>
-              <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">
+              <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="$compType">
                 <c:time-range start="${davDate.format(start)}" end="${davDate.format(end)}"/>
               </c:comp-filter></c:comp-filter></c:filter>
             </c:calendar-query>

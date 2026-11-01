@@ -3,6 +3,8 @@ package com.rvishal.tvcalendar.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rvishal.tvcalendar.data.model.CalendarEvent
+import com.rvishal.tvcalendar.data.model.EventSource
+import com.rvishal.tvcalendar.data.model.ItemKind
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
 import com.rvishal.tvcalendar.data.repo.EventRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,5 +39,21 @@ class CalendarViewModel(
                 syncing.value = false
             }
         }
+    }
+
+    /** Toggles completion for to-dos we own locally. */
+    fun toggleTodo(event: CalendarEvent) {
+        if (event.kind != ItemKind.TODO || event.source != EventSource.LOCAL) return
+        viewModelScope.launch { repository.setCompleted(event.id, !event.completed) }
+    }
+
+    fun addTodo(title: String, dayStartMillis: Long) {
+        if (title.isBlank()) return
+        viewModelScope.launch { repository.addLocalTodo(title.trim(), dayStartMillis) }
+    }
+
+    fun deleteItem(event: CalendarEvent) {
+        if (event.source != EventSource.LOCAL) return
+        viewModelScope.launch { repository.deleteItem(event.id) }
     }
 }

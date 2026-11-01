@@ -7,6 +7,8 @@ import com.rvishal.tvcalendar.R
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
 import com.rvishal.tvcalendar.data.repo.EventRepository
 import com.rvishal.tvcalendar.data.sources.GoogleAuthManager
+import com.rvishal.tvcalendar.data.sync.DailyDigestWorker
+import com.rvishal.tvcalendar.data.sync.TelegramDigest
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +32,10 @@ data class SettingsUiState(
     val syncErrors: Map<String, String>,
     val sourceEnabled: Map<String, Boolean>,
     val use24h: Boolean,
+    val telegramToken: String,
+    val telegramChatId: String,
+    val telegramEnabled: Boolean,
+    val telegramStatus: String?,
 )
 
 class SettingsViewModel(
@@ -37,6 +43,7 @@ class SettingsViewModel(
     val settings: SettingsStore,
     private val auth: GoogleAuthManager,
     private val repository: EventRepository,
+    private val telegramDigest: TelegramDigest,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -50,6 +57,10 @@ class SettingsViewModel(
             syncErrors = emptyMap(),
             sourceEnabled = sourceEnabledMap(),
             use24h = settings.use24Hour,
+            telegramToken = settings.telegramBotToken.orEmpty(),
+            telegramChatId = settings.telegramChatId.orEmpty(),
+            telegramEnabled = settings.telegramDigestEnabled,
+            telegramStatus = null,
         )
     )
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -123,6 +134,39 @@ class SettingsViewModel(
         _state.update { it.copy(use24h = v) }
     }
 
+    fun setTelegramToken(v: String) {
+        settings.telegramBotToken = v.trim()
+        _state.update { it.copy(telegramToken = v) }
+    }
+
+    fun setTelegramChatId(v: String) {
+        settings.telegramChatId = v.trim()
+        _state.update { it.copy(telegramChatId = v) }
+    }
+
+    fun setTelegramEnabled(v: Boolean) {
+        settings.telegramDigestEnabled = v
+        DailyDigestWorker.schedule(context, v)
+        _state.update { it.copy(telegramEnabled = v) }
+    }
+
+    /** Sends today's agenda immediately — also serves as a "test" button. */
+    fun sendTelegramNow() {
+        if (!settings.isTelegramConfigured) {
+            _state.update { it.copy(telegramStatus = "Enter bot token + chat ID first") }
+            return
+        }
+        _state.update { it.copy(telegramStatus = "Sending…") }
+        viewModelScope.launch {
+            try {
+                telegramDigest.send(repository.todayEvents())
+                _state.update { it.copy(telegramStatus = "Sent ✓") }
+            } catch (e: Exception) {
+                _state.update { it.copy(telegramStatus = "Failed: ${e.message}") }
+            }
+        }
+    }
+
     fun setSourceEnabled(name: String, enabled: Boolean) {
         settings.setSourceEnabled(name, enabled)
         _state.update { it.copy(sourceEnabled = sourceEnabledMap()) }
@@ -134,7 +178,10 @@ class SettingsViewModel(
 
     fun syncNow() {
         viewModelScope.launch {
-            _state.update { it.copy(syncErrors = repository.syncAll()) }
+            val errors = repository.syncAll()
+            val channelId = settings.homeChannelId
+            if (channelId > 0) com.rvishal.tvcalendar.di.AppGraph.homeChannel.publishToday(channelId)
+            _state.update { it.copy(syncErrors = errors) }
         }
     }
 }

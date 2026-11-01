@@ -86,6 +86,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.tv:tv-foundation:1.0.0-alpha12")
     implementation("androidx.tv:tv-material:1.0.0")
+    implementation("androidx.tvprovider:tvprovider:1.0.0")
 
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")

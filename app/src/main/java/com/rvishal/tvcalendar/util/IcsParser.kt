@@ -2,9 +2,11 @@ package com.rvishal.tvcalendar.util
 
 import com.rvishal.tvcalendar.data.model.CalendarEvent
 import com.rvishal.tvcalendar.data.model.EventSource
+import com.rvishal.tvcalendar.data.model.ItemKind
 import net.fortuna.ical4j.data.CalendarBuilder
 import net.fortuna.ical4j.model.Period
 import net.fortuna.ical4j.model.component.VEvent
+import net.fortuna.ical4j.model.component.VToDo
 import net.fortuna.ical4j.model.property.DtStart
 import net.fortuna.ical4j.util.MapTimeZoneCache
 import java.io.StringReader
@@ -57,6 +59,40 @@ object IcsParser {
                     allDay = allDay,
                 )
             }
+        }
+        return out
+    }
+
+    /**
+     * Parses VTODO components (Reminders / tasks) from ICS text. Each todo lands on
+     * its DUE date (falling back to DTSTART); completed ones are marked done.
+     */
+    fun parseTodos(
+        icsText: String,
+        source: EventSource,
+        calendarName: String,
+        windowStart: Long,
+        windowEnd: Long,
+    ): List<CalendarEvent> {
+        val calendar = CalendarBuilder().build(StringReader(icsText))
+        val out = mutableListOf<CalendarEvent>()
+        for (todo in calendar.getComponents<VToDo>(VToDo.VTODO)) {
+            val due = todo.due?.date?.time
+                ?: todo.getProperty<DtStart>("DTSTART")?.date?.time
+                ?: continue
+            if (due < windowStart || due >= windowEnd) continue
+            out += CalendarEvent(
+                id = "${source.name.lowercase()}:todo:${todo.uid?.value}",
+                source = source,
+                calendarName = calendarName,
+                title = todo.summary?.value ?: "(no title)",
+                description = todo.description?.value,
+                startMillis = due,
+                endMillis = due + 1,
+                allDay = true,
+                kind = ItemKind.TODO,
+                completed = todo.status?.value == "COMPLETED",
+            )
         }
         return out
     }

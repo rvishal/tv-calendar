@@ -5,7 +5,11 @@ enum class EventSource(val label: String, val color: Long) {
     APPLE("Apple", 0xFF8E8E93),
     SG_HOLIDAY("SG Holiday", 0xFF34A853),
     FESTIVAL("Festival", 0xFFFF9500),
+    GTASK("Google Tasks", 0xFF669DF6),
+    LOCAL("My To-dos", 0xFFAF52DE),
 }
+
+enum class ItemKind { EVENT, TODO }
 
 data class CalendarEvent(
     val id: String,
@@ -18,4 +22,6 @@ data class CalendarEvent(
     val endMillis: Long,
     val allDay: Boolean = false,
     val color: Long? = null,
+    val kind: ItemKind = ItemKind.EVENT,
+    val completed: Boolean = false,
 )

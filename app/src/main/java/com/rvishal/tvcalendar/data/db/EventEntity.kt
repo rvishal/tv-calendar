@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.rvishal.tvcalendar.data.model.CalendarEvent
 import com.rvishal.tvcalendar.data.model.EventSource
+import com.rvishal.tvcalendar.data.model.ItemKind
 
 @Entity(tableName = "events")
 data class EventEntity(
@@ -17,6 +18,8 @@ data class EventEntity(
     val endMillis: Long,
     val allDay: Boolean,
     val color: Long?,
+    val kind: String,
+    val completed: Boolean,
 ) {
     fun toModel() = CalendarEvent(
         id = id,
@@ -29,6 +32,8 @@ data class EventEntity(
         endMillis = endMillis,
         allDay = allDay,
         color = color,
+        kind = runCatching { ItemKind.valueOf(kind) }.getOrDefault(ItemKind.EVENT),
+        completed = completed,
     )
 
     companion object {
@@ -37,6 +42,7 @@ data class EventEntity(
             title = e.title, description = e.description, location = e.location,
             startMillis = e.startMillis, endMillis = e.endMillis,
             allDay = e.allDay, color = e.color,
+            kind = e.kind.name, completed = e.completed,
         )
     }
 }

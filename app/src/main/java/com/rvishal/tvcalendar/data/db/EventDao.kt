@@ -21,6 +21,15 @@ interface EventDao {
     @Query("DELETE FROM events WHERE source = :source")
     suspend fun deleteSource(source: String)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(event: EventEntity)
+
+    @Query("UPDATE events SET completed = :completed WHERE id = :id")
+    suspend fun setCompleted(id: String, completed: Boolean)
+
+    @Query("DELETE FROM events WHERE id = :id")
+    suspend fun delete(id: String)
+
     @Query("DELETE FROM events")
     suspend fun clear()
 }
