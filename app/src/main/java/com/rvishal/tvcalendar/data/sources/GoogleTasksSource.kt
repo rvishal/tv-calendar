@@ -82,7 +82,7 @@ class GoogleTasksSource(
                     if (task.deleted || task.hidden) continue
                     // Undated tasks anchor to today — same rule as CalDAV reminders.
                     val due = task.due?.let { Instant.parse(it).toEpochMilli() }
-                        ?: Dates.dayKeyMillis(System.currentTimeMillis(), allDay = true)
+                        ?: Dates.localDayUtcAnchor(System.currentTimeMillis())
                     if (due < windowStartMillis || due >= windowEndMillis) continue
                     out += CalendarEvent(
                         id = "gtask:${list.id}:${task.id}",
@@ -94,6 +94,7 @@ class GoogleTasksSource(
                         endMillis = due + 1,
                         allDay = true,
                         kind = ItemKind.TODO,
+                        undated = task.due == null,
                         completed = task.status == "completed",
                     )
                 }

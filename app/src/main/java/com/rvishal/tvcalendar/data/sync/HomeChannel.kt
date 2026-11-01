@@ -54,19 +54,21 @@ class HomeChannel(
         try {
             // The provider rejects query/delete selections entirely, so we track
             // the program IDs we insert and delete each by URI on the next publish.
+            // Keep IDs whose delete failed so the next publish retries them —
+            // forgetting them strands the stale card in the channel forever.
+            val failedIds = mutableSetOf<String>()
             for (id in settings.homeChannelProgramIds) {
                 runCatching {
                     context.contentResolver.delete(
                         TvContractCompat.buildPreviewProgramUri(id.toLong()), null, null,
                     )
-                }
+                }.onFailure { failedIds += id }
             }
-            settings.homeChannelProgramIds = emptySet()
             val newIds = mutableSetOf<String>()
             events.forEachIndexed { i, e ->
                 insertProgram(channelId, i, e)?.let { newIds += it.toString() }
             }
-            settings.homeChannelProgramIds = newIds
+            settings.homeChannelProgramIds = failedIds + newIds
         } catch (e: Exception) {
             android.util.Log.w("HomeChannel", "publish failed", e)
         }

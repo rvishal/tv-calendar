@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.rvishal.tvcalendar.data.db.AppDatabase
 import com.rvishal.tvcalendar.data.db.MIGRATION_1_2
+import com.rvishal.tvcalendar.data.db.MIGRATION_2_3
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
 import com.rvishal.tvcalendar.data.repo.EventRepository
 import com.rvishal.tvcalendar.data.sources.CalDavSource
@@ -41,7 +42,7 @@ object AppGraph {
 
     val db: AppDatabase by lazy {
         Room.databaseBuilder(appContext, AppDatabase::class.java, "tvcalendar.db")
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
     }
 

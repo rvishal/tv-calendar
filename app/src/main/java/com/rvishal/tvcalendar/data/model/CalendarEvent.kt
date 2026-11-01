@@ -24,4 +24,6 @@ data class CalendarEvent(
     val color: Long? = null,
     val kind: ItemKind = ItemKind.EVENT,
     val completed: Boolean = false,
+    /** Todo with no due date — re-anchored to today at read time instead of going stale. */
+    val undated: Boolean = false,
 )

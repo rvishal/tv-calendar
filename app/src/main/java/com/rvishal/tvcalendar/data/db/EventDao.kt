@@ -9,10 +9,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EventDao {
 
-    @Query("SELECT * FROM events WHERE startMillis < :windowEnd AND endMillis > :windowStart ORDER BY startMillis")
+    // Undated open todos match every window: they re-anchor to today at read time.
+    @Query("SELECT * FROM events WHERE (startMillis < :windowEnd AND endMillis > :windowStart) OR (kind = 'TODO' AND undated = 1 AND completed = 0) ORDER BY startMillis")
     fun observe(windowStart: Long, windowEnd: Long): Flow<List<EventEntity>>
 
-    @Query("SELECT * FROM events WHERE startMillis < :windowEnd AND endMillis > :windowStart ORDER BY startMillis")
+    @Query("SELECT * FROM events WHERE (startMillis < :windowEnd AND endMillis > :windowStart) OR (kind = 'TODO' AND undated = 1 AND completed = 0) ORDER BY startMillis")
     suspend fun inWindow(windowStart: Long, windowEnd: Long): List<EventEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

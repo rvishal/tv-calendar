@@ -29,7 +29,8 @@ fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { Cal
     val now = System.currentTimeMillis()
     val todayStart = Dates.startOfDay(now)
     val upcoming = events.filter { e ->
-        if (e.allDay) Dates.dayKeyMillis(e.startMillis, allDay = true) >= todayStart
+        // All-day items stay "upcoming" until their last day passes (endMillis is exclusive).
+        if (e.allDay) Dates.dayKeyMillis(e.endMillis - 1, allDay = true) >= todayStart
         else e.endMillis >= now
     }.sortedBy { it.startMillis }
     val grouped = upcoming.groupBy { Dates.dayKeyMillis(it.startMillis, it.allDay) }.toSortedMap()

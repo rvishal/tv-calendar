@@ -5,6 +5,7 @@ import androidx.room.PrimaryKey
 import com.rvishal.tvcalendar.data.model.CalendarEvent
 import com.rvishal.tvcalendar.data.model.EventSource
 import com.rvishal.tvcalendar.data.model.ItemKind
+import com.rvishal.tvcalendar.util.Dates
 
 @Entity(tableName = "events")
 data class EventEntity(
@@ -20,21 +21,28 @@ data class EventEntity(
     val color: Long?,
     val kind: String,
     val completed: Boolean,
+    val undated: Boolean = false,
 ) {
-    fun toModel() = CalendarEvent(
-        id = id,
-        source = EventSource.valueOf(source),
-        calendarName = calendarName,
-        title = title,
-        description = description,
-        location = location,
-        startMillis = startMillis,
-        endMillis = endMillis,
-        allDay = allDay,
-        color = color,
-        kind = runCatching { ItemKind.valueOf(kind) }.getOrDefault(ItemKind.EVENT),
-        completed = completed,
-    )
+    fun toModel(): CalendarEvent {
+        // Undated open todos carry today's anchor so they don't go stale between syncs.
+        val float = kind == ItemKind.TODO.name && undated && !completed
+        val start = if (float) Dates.localDayUtcAnchor(System.currentTimeMillis()) else startMillis
+        return CalendarEvent(
+            id = id,
+            source = EventSource.valueOf(source),
+            calendarName = calendarName,
+            title = title,
+            description = description,
+            location = location,
+            startMillis = start,
+            endMillis = if (float) start + 1 else endMillis,
+            allDay = allDay,
+            color = color,
+            kind = runCatching { ItemKind.valueOf(kind) }.getOrDefault(ItemKind.EVENT),
+            completed = completed,
+            undated = undated,
+        )
+    }
 
     companion object {
         fun from(e: CalendarEvent) = EventEntity(
@@ -42,7 +50,7 @@ data class EventEntity(
             title = e.title, description = e.description, location = e.location,
             startMillis = e.startMillis, endMillis = e.endMillis,
             allDay = e.allDay, color = e.color,
-            kind = e.kind.name, completed = e.completed,
+            kind = e.kind.name, completed = e.completed, undated = e.undated,
         )
     }
 }

@@ -75,13 +75,13 @@ object IcsParser {
         windowStart: Long,
         windowEnd: Long,
     ): List<CalendarEvent> {
-        val todayUtc = Dates.dayKeyMillis(System.currentTimeMillis(), allDay = true)
+        val todayAnchor = Dates.localDayUtcAnchor(System.currentTimeMillis())
         val calendar = CalendarBuilder().build(StringReader(icsText))
         val out = mutableListOf<CalendarEvent>()
         for (todo in calendar.getComponents<VToDo>(VToDo.VTODO)) {
-            val due = todo.due?.date?.time
+            val dated = todo.due?.date?.time
                 ?: todo.getProperty<DtStart>("DTSTART")?.date?.time
-                ?: todayUtc
+            val due = dated ?: todayAnchor
             if (due < windowStart || due >= windowEnd) continue
             out += CalendarEvent(
                 id = "${source.name.lowercase()}:todo:${todo.uid?.value}",
@@ -94,6 +94,7 @@ object IcsParser {
                 allDay = true,
                 kind = ItemKind.TODO,
                 completed = todo.status?.value == "COMPLETED",
+                undated = dated == null,
             )
         }
         return out
