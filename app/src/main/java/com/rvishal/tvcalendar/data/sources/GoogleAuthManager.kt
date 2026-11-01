@@ -16,7 +16,7 @@ class GoogleAuthManager(
     private val settings: SettingsStore,
     private val json: Json,
 ) {
-    private val scope = "https://www.googleapis.com/auth/calendar.readonly"
+    private val scope = "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/tasks.readonly"
 
     @Serializable
     data class DeviceCodeResponse(

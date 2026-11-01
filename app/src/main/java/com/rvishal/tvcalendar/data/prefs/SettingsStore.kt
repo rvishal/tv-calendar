@@ -43,6 +43,35 @@ class SettingsStore(context: Context) {
         get() = prefs.getBoolean("use_24h", false)
         set(v) = prefs.edit().putBoolean("use_24h", v).apply()
 
+    var telegramBotToken: String?
+        get() = prefs.getString("telegram_bot_token", null)
+        set(v) = prefs.edit().putString("telegram_bot_token", v).apply()
+
+    var telegramChatId: String?
+        get() = prefs.getString("telegram_chat_id", null)
+        set(v) = prefs.edit().putString("telegram_chat_id", v).apply()
+
+    var telegramDigestEnabled: Boolean
+        get() = prefs.getBoolean("telegram_digest", false)
+        set(v) = prefs.edit().putBoolean("telegram_digest", v).apply()
+
+    var homeChannelAsked: Boolean
+        get() = prefs.getBoolean("home_channel_asked", false)
+        set(v) = prefs.edit().putBoolean("home_channel_asked", v).apply()
+
+    var homeChannelId: Long
+        get() = prefs.getLong("home_channel_id", -1L)
+        set(v) = prefs.edit().putLong("home_channel_id", v).apply()
+
+    /** Program IDs we inserted into the home channel — needed because this TV's
+     *  provider rejects delete-by-selection, so we delete by URI next publish. */
+    var homeChannelProgramIds: Set<String>
+        get() = prefs.getStringSet("home_channel_programs", emptySet()) ?: emptySet()
+        set(v) = prefs.edit().putStringSet("home_channel_programs", v).apply()
+
+    val isTelegramConfigured: Boolean
+        get() = !telegramBotToken.isNullOrBlank() && !telegramChatId.isNullOrBlank()
+
     fun isSourceEnabled(source: String): Boolean = prefs.getBoolean("src_$source", true)
     fun setSourceEnabled(source: String, enabled: Boolean) =
         prefs.edit().putBoolean("src_$source", enabled).apply()

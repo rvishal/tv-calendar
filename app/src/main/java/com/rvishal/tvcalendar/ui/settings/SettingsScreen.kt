@@ -33,6 +33,7 @@ fun SettingsScreen(nav: NavHostController): Unit {
             com.rvishal.tvcalendar.di.AppGraph.settings,
             com.rvishal.tvcalendar.di.AppGraph.googleAuth,
             com.rvishal.tvcalendar.di.AppGraph.repository,
+            com.rvishal.tvcalendar.di.AppGraph.telegramDigest,
         )
     }
     val state by vm.state.collectAsState()
@@ -146,6 +147,38 @@ fun SettingsScreen(nav: NavHostController): Unit {
             }
 
             item {
+                Text("Telegram daily digest", fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(top = 24.dp))
+                Text(
+                    "Sends each day's agenda to your Telegram at 8 AM. Bot token from @BotFather; chat ID by messaging your bot then reading getUpdates.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                )
+                SettingInput(
+                    label = "Bot token",
+                    value = state.telegramToken,
+                    password = true,
+                    onChange = vm::setTelegramToken,
+                )
+                SettingInput(
+                    label = "Chat ID",
+                    value = state.telegramChatId,
+                    onChange = vm::setTelegramChatId,
+                )
+                SettingSwitch("Daily digest at 8 AM", state.telegramEnabled) { vm.setTelegramEnabled(it) }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(onClick = vm::sendTelegramNow) { Text("Send today's agenda now") }
+                    if (state.telegramStatus != null) {
+                        Text(state.telegramStatus!!, fontSize = 13.sp,
+                            color = if (state.telegramStatus!!.startsWith("Failed"))
+                                MaterialTheme.colorScheme.error
+                            else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f))
+                    }
+                }
+            }
+
+            item {
                 Text("Display", fontSize = 18.sp, color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 24.dp))
                 SettingSwitch("24-hour time", state.use24h) { vm.set24h(it) }
@@ -169,7 +202,7 @@ fun SettingsScreen(nav: NavHostController): Unit {
 }
 
 private fun srcStatus(src: EventSource, state: SettingsUiState): String = when (src) {
-    EventSource.GOOGLE -> if (state.google is GoogleState.SignedIn) "" else " (not signed in)"
+    EventSource.GOOGLE, EventSource.GTASK -> if (state.google is GoogleState.SignedIn) "" else " (not signed in)"
     EventSource.APPLE -> if (state.caldavUser.isNotBlank() && state.caldavPassword.isNotBlank()) "" else " (not configured)"
     else -> ""
 }
