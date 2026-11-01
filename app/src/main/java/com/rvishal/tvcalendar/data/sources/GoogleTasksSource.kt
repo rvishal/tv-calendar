@@ -6,6 +6,7 @@ import com.rvishal.tvcalendar.data.model.CalendarEvent
 import com.rvishal.tvcalendar.data.model.EventSource
 import com.rvishal.tvcalendar.data.model.ItemKind
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
+import com.rvishal.tvcalendar.util.Dates
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -79,7 +80,9 @@ class GoogleTasksSource(
                 } while (page != null)
                 for (task in tasks) {
                     if (task.deleted || task.hidden) continue
-                    val due = task.due?.let { Instant.parse(it).toEpochMilli() } ?: continue
+                    // Undated tasks anchor to today — same rule as CalDAV reminders.
+                    val due = task.due?.let { Instant.parse(it).toEpochMilli() }
+                        ?: Dates.dayKeyMillis(System.currentTimeMillis(), allDay = true)
                     if (due < windowStartMillis || due >= windowEndMillis) continue
                     out += CalendarEvent(
                         id = "gtask:${list.id}:${task.id}",

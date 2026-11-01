@@ -63,6 +63,12 @@ class SettingsStore(context: Context) {
         get() = prefs.getLong("home_channel_id", -1L)
         set(v) = prefs.edit().putLong("home_channel_id", v).apply()
 
+    /** Program IDs we inserted into the home channel — needed because this TV's
+     *  provider rejects delete-by-selection, so we delete by URI next publish. */
+    var homeChannelProgramIds: Set<String>
+        get() = prefs.getStringSet("home_channel_programs", emptySet()) ?: emptySet()
+        set(v) = prefs.edit().putStringSet("home_channel_programs", v).apply()
+
     val isTelegramConfigured: Boolean
         get() = !telegramBotToken.isNullOrBlank() && !telegramChatId.isNullOrBlank()
 

@@ -41,7 +41,9 @@ class CalDavSource(
         for (cal in calendars) {
             for ((xml, parser) in listOfNotNull(
                 reportCalendar(cal.url, "VEVENT", windowStartMillis, windowEndMillis)?.let { it to IcsParser::parse },
-                reportCalendar(cal.url, "VTODO", windowStartMillis, windowEndMillis)?.let { it to IcsParser::parseTodos },
+                // No time-range for VTODO: iCloud reminders are mostly undated and
+                // a time-range would exclude them all.
+                reportTodos(cal.url)?.let { it to IcsParser::parseTodos },
             )) {
                 for (ics in extractCalendarData(xml)) {
                     runCatching {
@@ -108,6 +110,16 @@ class CalDavSource(
               <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="$compType">
                 <c:time-range start="${davDate.format(start)}" end="${davDate.format(end)}"/>
               </c:comp-filter></c:comp-filter></c:filter>
+            </c:calendar-query>
+        """.trimIndent()
+        return davRequest("REPORT", calendarUrl, "1", body)
+    }
+
+    private suspend fun reportTodos(calendarUrl: String): String? {
+        val body = """
+            <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+              <d:prop><d:getetag/><c:calendar-data/></d:prop>
+              <c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter>
             </c:calendar-query>
         """.trimIndent()
         return davRequest("REPORT", calendarUrl, "1", body)

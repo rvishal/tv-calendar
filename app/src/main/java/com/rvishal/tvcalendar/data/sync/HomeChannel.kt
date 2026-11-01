@@ -52,18 +52,27 @@ class HomeChannel(
             .sortedBy { it.startMillis }
             .take(20)
         try {
-            context.contentResolver.delete(
-                TvContractCompat.PreviewPrograms.CONTENT_URI,
-                "${TvContractCompat.PreviewPrograms.COLUMN_CHANNEL_ID}=?",
-                arrayOf(channelId.toString()),
-            )
-            events.forEachIndexed { i, e -> insertProgram(channelId, i, e) }
+            // The provider rejects query/delete selections entirely, so we track
+            // the program IDs we insert and delete each by URI on the next publish.
+            for (id in settings.homeChannelProgramIds) {
+                runCatching {
+                    context.contentResolver.delete(
+                        TvContractCompat.buildPreviewProgramUri(id.toLong()), null, null,
+                    )
+                }
+            }
+            settings.homeChannelProgramIds = emptySet()
+            val newIds = mutableSetOf<String>()
+            events.forEachIndexed { i, e ->
+                insertProgram(channelId, i, e)?.let { newIds += it.toString() }
+            }
+            settings.homeChannelProgramIds = newIds
         } catch (e: Exception) {
             android.util.Log.w("HomeChannel", "publish failed", e)
         }
     }
 
-    private fun insertProgram(channelId: Long, pos: Int, event: CalendarEvent) {
+    private fun insertProgram(channelId: Long, pos: Int, event: CalendarEvent): Long? {
         val title = when {
             event.kind == ItemKind.TODO -> (if (event.completed) "✓ " else "○ ") + event.title
             event.allDay -> event.title
@@ -78,7 +87,11 @@ class HomeChannel(
             .setWeight(pos)
             .setIntentUri(android.net.Uri.parse(launchIntentUri(event)))
             .build()
-        context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+        return runCatching {
+            context.contentResolver.insert(
+                TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues(),
+            )?.let { android.content.ContentUris.parseId(it) }
+        }.getOrNull()
     }
 
     private fun launchIntentUri(event: CalendarEvent): String {

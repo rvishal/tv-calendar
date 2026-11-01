@@ -65,7 +65,8 @@ object IcsParser {
 
     /**
      * Parses VTODO components (Reminders / tasks) from ICS text. Each todo lands on
-     * its DUE date (falling back to DTSTART); completed ones are marked done.
+     * its DUE date (falling back to DTSTART); undated todos anchor to today so
+     * they stay visible — iCloud Reminders are mostly undated. Completed = done.
      */
     fun parseTodos(
         icsText: String,
@@ -74,12 +75,13 @@ object IcsParser {
         windowStart: Long,
         windowEnd: Long,
     ): List<CalendarEvent> {
+        val todayUtc = Dates.dayKeyMillis(System.currentTimeMillis(), allDay = true)
         val calendar = CalendarBuilder().build(StringReader(icsText))
         val out = mutableListOf<CalendarEvent>()
         for (todo in calendar.getComponents<VToDo>(VToDo.VTODO)) {
             val due = todo.due?.date?.time
                 ?: todo.getProperty<DtStart>("DTSTART")?.date?.time
-                ?: continue
+                ?: todayUtc
             if (due < windowStart || due >= windowEnd) continue
             out += CalendarEvent(
                 id = "${source.name.lowercase()}:todo:${todo.uid?.value}",

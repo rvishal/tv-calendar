@@ -27,7 +27,11 @@ import com.rvishal.tvcalendar.util.Dates
 fun AgendaScreen(nav: NavHostController, vm: CalendarViewModel = viewModel { CalendarViewModel(com.rvishal.tvcalendar.di.AppGraph.repository, com.rvishal.tvcalendar.di.AppGraph.settings) }) {
     val events by vm.events.collectAsState()
     val now = System.currentTimeMillis()
-    val upcoming = events.filter { it.endMillis >= now }.sortedBy { it.startMillis }
+    val todayStart = Dates.startOfDay(now)
+    val upcoming = events.filter { e ->
+        if (e.allDay) Dates.dayKeyMillis(e.startMillis, allDay = true) >= todayStart
+        else e.endMillis >= now
+    }.sortedBy { it.startMillis }
     val grouped = upcoming.groupBy { Dates.dayKeyMillis(it.startMillis, it.allDay) }.toSortedMap()
 
     Column(Modifier.fillMaxSize()) {
