@@ -27,7 +27,10 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.compose.ui.text.style.TextDecoration
 import com.rvishal.tvcalendar.data.model.CalendarEvent
+import com.rvishal.tvcalendar.data.model.EventSource
+import com.rvishal.tvcalendar.data.model.ItemKind
 import com.rvishal.tvcalendar.util.Dates
 
 enum class ViewMode(val route: String, val label: String) {
@@ -77,8 +80,9 @@ fun eventsOnDay(events: List<CalendarEvent>, dayMillis: Long): List<CalendarEven
 }
 
 @Composable
-fun EventRow(event: CalendarEvent, use24h: Boolean, onClick: () -> Unit = {}) {
+fun EventRow(event: CalendarEvent, use24h: Boolean, onClick: (() -> Unit)? = null) {
     var focused by remember { mutableStateOf(false) }
+    val isTodo = event.kind == ItemKind.TODO
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -89,19 +93,34 @@ fun EventRow(event: CalendarEvent, use24h: Boolean, onClick: () -> Unit = {}) {
                 RoundedCornerShape(6.dp),
             )
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
             .padding(vertical = 4.dp, horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(
-            Modifier
-                .width(6.dp)
-                .height(36.dp)
-                .background(Color(event.color ?: event.source.color))
-        )
+        if (isTodo) {
+            Text(
+                if (event.completed) "✓" else "○",
+                fontSize = 20.sp,
+                color = Color(event.color ?: event.source.color),
+                modifier = Modifier.width(24.dp),
+            )
+        } else {
+            Spacer(
+                Modifier
+                    .width(6.dp)
+                    .height(36.dp)
+                    .background(Color(event.color ?: event.source.color))
+            )
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(event.title, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                event.title,
+                fontSize = 17.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textDecoration = if (event.completed) TextDecoration.LineThrough else TextDecoration.None,
+            )
             Text(
                 event.calendarName + if (event.location != null) " · ${event.location}" else "",
                 fontSize = 13.sp,
@@ -111,7 +130,8 @@ fun EventRow(event: CalendarEvent, use24h: Boolean, onClick: () -> Unit = {}) {
             )
         }
         Text(
-            if (event.allDay) "All day"
+            if (isTodo) "To-do"
+            else if (event.allDay) "All day"
             else "${Dates.time(event.startMillis, use24h)} – ${Dates.time(event.endMillis, use24h)}",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),

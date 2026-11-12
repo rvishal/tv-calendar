@@ -14,7 +14,9 @@ class SyncWorker(
 
     override suspend fun doWork(): Result {
         val errors = AppGraph.repository.syncAll()
-        return if (errors.size == 4) Result.retry() else Result.success()
+        val channelId = AppGraph.settings.homeChannelId
+        if (channelId > 0) AppGraph.homeChannel.publishToday(channelId)
+        return if (errors.size == AppGraph.sources.size) Result.retry() else Result.success()
     }
 
     companion object {

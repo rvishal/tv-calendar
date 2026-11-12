@@ -3,6 +3,8 @@ package com.rvishal.tvcalendar.di
 import android.content.Context
 import androidx.room.Room
 import com.rvishal.tvcalendar.data.db.AppDatabase
+import com.rvishal.tvcalendar.data.db.MIGRATION_1_2
+import com.rvishal.tvcalendar.data.db.MIGRATION_2_3
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
 import com.rvishal.tvcalendar.data.repo.EventRepository
 import com.rvishal.tvcalendar.data.sources.CalDavSource
@@ -10,7 +12,10 @@ import com.rvishal.tvcalendar.data.sources.EventDataSource
 import com.rvishal.tvcalendar.data.sources.FestivalIcsSource
 import com.rvishal.tvcalendar.data.sources.GoogleAuthManager
 import com.rvishal.tvcalendar.data.sources.GoogleCalendarSource
+import com.rvishal.tvcalendar.data.sources.GoogleTasksSource
 import com.rvishal.tvcalendar.data.sources.SgHolidaySource
+import com.rvishal.tvcalendar.data.sync.HomeChannel
+import com.rvishal.tvcalendar.data.sync.TelegramDigest
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
@@ -36,7 +41,9 @@ object AppGraph {
     val settings: SettingsStore by lazy { SettingsStore(appContext) }
 
     val db: AppDatabase by lazy {
-        Room.databaseBuilder(appContext, AppDatabase::class.java, "tvcalendar.db").build()
+        Room.databaseBuilder(appContext, AppDatabase::class.java, "tvcalendar.db")
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .build()
     }
 
     val googleAuth: GoogleAuthManager by lazy { GoogleAuthManager(okHttp, settings, json) }
@@ -44,6 +51,7 @@ object AppGraph {
     val sources: List<EventDataSource> by lazy {
         listOf(
             GoogleCalendarSource(appContext, okHttp, googleAuth, settings, json),
+            GoogleTasksSource(appContext, okHttp, googleAuth, settings, json),
             CalDavSource(okHttp, settings),
             SgHolidaySource(okHttp, json),
             FestivalIcsSource(okHttp, settings),
@@ -53,4 +61,8 @@ object AppGraph {
     val repository: EventRepository by lazy {
         EventRepository(db.eventDao(), sources.toSet(), settings)
     }
+
+    val telegramDigest: TelegramDigest by lazy { TelegramDigest(okHttp, settings, json) }
+
+    val homeChannel: HomeChannel by lazy { HomeChannel(appContext, settings, repository) }
 }

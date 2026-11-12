@@ -4,12 +4,14 @@ import com.rvishal.tvcalendar.data.db.EventDao
 import com.rvishal.tvcalendar.data.db.EventEntity
 import com.rvishal.tvcalendar.data.model.CalendarEvent
 import com.rvishal.tvcalendar.data.model.EventSource
+import com.rvishal.tvcalendar.data.model.ItemKind
 import com.rvishal.tvcalendar.data.prefs.SettingsStore
 import com.rvishal.tvcalendar.data.sources.EventDataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.Calendar
 import java.util.TimeZone
+import java.util.UUID
 class EventRepository(
     private val dao: EventDao,
     private val sources: Set<EventDataSource>,
@@ -51,6 +53,64 @@ class EventRepository(
             }
         }
         return errors
+    }
+
+    /** To-do created on the TV itself — stored locally, never synced anywhere. */
+    suspend fun addLocalTodo(title: String, dayStartMillis: Long) {
+        val start = utcMidnight(dayStartMillis)
+        dao.upsert(
+            EventEntity.from(
+                CalendarEvent(
+                    id = "local:${UUID.randomUUID()}",
+                    source = EventSource.LOCAL,
+                    calendarName = "My To-dos",
+                    title = title,
+                    startMillis = start,
+                    endMillis = start + 1,
+                    allDay = true,
+                    kind = ItemKind.TODO,
+                )
+            )
+        )
+    }
+
+    suspend fun setCompleted(id: String, completed: Boolean) = dao.setCompleted(id, completed)
+
+    suspend fun deleteItem(id: String) = dao.delete(id)
+
+    suspend fun todayEvents(): List<CalendarEvent> {
+        val start = startOfDay(System.currentTimeMillis())
+        val end = Calendar.getInstance().apply { timeInMillis = start; add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
+        val day = 86_400_000L
+        // Widen the query to cover UTC-anchored all-day items, then filter precisely.
+        return dao.inWindow(start - day, end + day).map { it.toModel() }
+            .filter { settings.isSourceEnabled(it.source.name) }
+            .filter { e ->
+                if (e.allDay) {
+                    val first = com.rvishal.tvcalendar.util.Dates.dayKeyMillis(e.startMillis, true)
+                    val last = com.rvishal.tvcalendar.util.Dates.dayKeyMillis(maxOf(e.startMillis, e.endMillis - 1), true)
+                    first <= start && last >= start
+                } else {
+                    e.startMillis < end && e.endMillis > start
+                }
+            }
+    }
+
+    private fun startOfDay(millis: Long): Long {
+        val c = Calendar.getInstance()
+        c.timeInMillis = millis
+        c.set(Calendar.HOUR_OF_DAY, 0); c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0); c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
+    /** UTC-midnight anchor for the local calendar day containing [millis]. */
+    private fun utcMidnight(millis: Long): Long {
+        val local = Calendar.getInstance().apply { timeInMillis = millis }
+        val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        utc.clear()
+        utc.set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+        return utc.timeInMillis
     }
 
     suspend fun clearAll() = dao.clear()

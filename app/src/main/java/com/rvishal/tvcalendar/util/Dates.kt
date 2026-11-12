@@ -79,6 +79,21 @@ object Dates {
         return local.timeInMillis
     }
 
+    /**
+     * UTC-midnight anchor carrying the *local* calendar date of [millis].
+     * All-day items are stored at UTC midnight of their date; for undated todos
+     * this anchors them to today in the user's timezone (east of UTC, now's UTC
+     * date can still be yesterday — don't use dayKeyMillis(now) here).
+     */
+    fun localDayUtcAnchor(millis: Long): Long {
+        val local = Calendar.getInstance()
+        local.timeInMillis = millis
+        val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        utc.clear()
+        utc.set(local.get(Calendar.YEAR), local.get(Calendar.MONTH), local.get(Calendar.DAY_OF_MONTH))
+        return utc.timeInMillis
+    }
+
     fun isToday(millis: Long): Boolean =
         startOfDay(millis) == startOfDay(System.currentTimeMillis())
 
